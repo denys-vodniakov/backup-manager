@@ -1,10 +1,39 @@
+# Secrets and local configuration
 .env
+.env.*
+!.env.example
+!examples/*.env.example
+
+# Runtime data
 logs/*
 tmp/*
 backups/*
 *.log
+
+# rclone and cloud credentials
 rclone.conf
 .config/
+**/.config/rclone/
+
+# Backup artifacts (never commit dumps or archives)
+*.sql
+*.sql.gz
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# Keys and certificates
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+
+# OS and editor
+.DS_Store
+*.swp
+*~
 
 !logs/.gitkeep
 !tmp/.gitkeep
