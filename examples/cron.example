@@ -1,0 +1,26 @@
+# =============================================================================
+# Cron examples for backup-manager
+# =============================================================================
+# Edit paths and schedule to match your hosting environment.
+# Use 'crontab -e' to install. All times are server local time.
+# =============================================================================
+
+# --- Daily database-only backup ---
+# Run at 02:30 every day; logs appended to cron.log
+# 30 2 * * * cd "$HOME/backup-manager" && ENABLE_FILE_BACKUP=false ENABLE_MYSQL_BACKUP=true ./backup.sh >> "$HOME/backup-manager/logs/cron.log" 2>&1
+
+# --- Weekly full backup (files + database + remote upload) ---
+# Run every Sunday at 03:00
+# 0 3 * * 0 cd "$HOME/backup-manager" && ./backup.sh >> "$HOME/backup-manager/logs/cron.log" 2>&1
+
+# --- Daily full backup with explicit logging ---
+# 15 1 * * * cd "$HOME/backup-manager" && /usr/bin/env bash ./backup.sh >> "$HOME/backup-manager/logs/cron-$(date +\%Y-\%m-\%d).log" 2>&1
+
+# --- Recommended: use a wrapper that loads .env automatically ---
+# 0 2 * * * "$HOME/backup-manager/backup.sh" >> "$HOME/backup-manager/logs/cron.log" 2>&1
+
+# Notes:
+# - backup.sh loads .env from its own directory; no extra sourcing needed.
+# - Each run also creates a timestamped log in LOG_DIR (see .env).
+# - On shared hosting, verify cron mail or redirect stdout/stderr as above.
+# - Test manually before enabling cron: cd ~/backup-manager && ./backup.sh
