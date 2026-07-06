@@ -1,0 +1,11 @@
+.env
+logs/*
+tmp/*
+backups/*
+*.log
+rclone.conf
+.config/
+
+!logs/.gitkeep
+!tmp/.gitkeep
+!backups/.gitkeep
