@@ -1,7 +1,11 @@
 # Secrets and local configuration
 .env
+.env.daily
+.env.weekly
 .env.*
 !.env.example
+!.env.daily.example
+!.env.weekly.example
 !examples/*.env.example
 
 # Runtime data
