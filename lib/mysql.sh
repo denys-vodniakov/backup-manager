@@ -23,6 +23,7 @@ mysql_dump() {
 		--single-transaction \
 		--quick \
 		--lock-tables=false \
+		--no-tablespaces \
 		"${DB_NAME}" | gzip -c > "${output_file}"; then
 		unset MYSQL_PWD
 		log_error "mysqldump failed for database: ${DB_NAME}"
