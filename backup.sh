@@ -42,10 +42,13 @@ trap cleanup_on_exit EXIT
 main() {
 	cd "${SCRIPT_DIR}"
 
-	init_logger
-	log_info "=== Backup started: ${PROJECT_NAME:-unknown} ==="
+	local env_file
+	env_file="$(resolve_env_file "${SCRIPT_DIR}")"
+	load_env "${env_file}"
 
-	load_env "${SCRIPT_DIR}/.env"
+	init_logger
+	log_info "=== Backup started: ${PROJECT_NAME:-unknown} (env: $(basename "${env_file}")) ==="
+
 	validate_backup_env
 	validate_backup_tools
 

@@ -7,11 +7,45 @@ _LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/safety.sh
 source "${_LIB_DIR}/safety.sh"
 
+# Resolve ENV_FILE / default .env; must stay under the project directory.
+resolve_env_file() {
+	local script_dir="$1"
+	local requested="${ENV_FILE:-.env}"
+	local base resolved
+
+	base="$(basename "${requested}")"
+	case "${base}" in
+		.env|.env.daily|.env.weekly|.env.example|.env.daily.example|.env.weekly.example) ;;
+		*)
+			printf 'ERROR: ENV_FILE basename not allowed: %s\n' "${base}" >&2
+			printf 'Allowed: .env, .env.daily, .env.weekly (or their *.example templates).\n' >&2
+			return 1
+			;;
+	esac
+
+	if [[ "${requested}" == /* ]]; then
+		resolved="${requested}"
+	else
+		resolved="${script_dir}/${base}"
+	fi
+
+	# Absolute path must still resolve under script_dir (no path escape)
+	case "${resolved}" in
+		"${script_dir}"|"${script_dir}"/*) ;;
+		*)
+			printf 'ERROR: ENV_FILE must be inside project directory: %s\n' "${resolved}" >&2
+			return 1
+			;;
+	esac
+
+	printf '%s' "${resolved}"
+}
+
 load_env() {
 	local env_file="${1:-.env}"
 	if [[ ! -f "${env_file}" ]]; then
 		printf 'ERROR: Environment file not found: %s\n' "${env_file}" >&2
-		printf 'Copy .env.example to .env and configure it.\n' >&2
+		printf 'Copy .env.daily.example to .env.daily (or .env.weekly.example / .env.example).\n' >&2
 		return 1
 	fi
 

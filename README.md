@@ -25,7 +25,7 @@ A secure, production-ready Bash backup manager for Linux hosting environments wi
 
 ## Security model
 
-- **Secrets stay local.** Only `.env.example` is committed; `.env` is gitignored.
+- **Secrets stay local.** Only `*.example` env templates are committed; `.env`, `.env.daily`, `.env.weekly` are gitignored.
 - **Path safety checks** prevent deletion outside configured `BACKUP_DIR`.
 - Critical paths must be **absolute**, cannot be `/`, `.`, `..`, or contain `..` components.
 - `RESTORE_TARGET_PATH` cannot be the home directory root.
@@ -42,8 +42,8 @@ A secure, production-ready Bash backup manager for Linux hosting environments wi
 ### Gitignored paths
 
 ```
-.env
-.env.*
+.env, .env.daily, .env.weekly, .env.*
+(examples committed: .env.example, .env.daily.example, .env.weekly.example)
 *.sql / *.sql.gz / *.tar.gz
 logs/*, tmp/*, backups/*
 rclone.conf, .config/
@@ -55,12 +55,23 @@ rclone.conf, .config/
 ```bash
 git clone https://github.com/denys-vodniakov/backup-manager.git ~/backup-manager
 cd ~/backup-manager
-cp .env.example .env
-chmod 600 .env
+cp .env.daily.example .env.daily
+cp .env.weekly.example .env.weekly
+chmod 600 .env.daily .env.weekly
 chmod +x backup.sh restore.sh
 ```
 
-Edit `.env` with your paths and credentials.
+Edit DB credentials and paths in both files.
+
+- **`.env.daily`** — MySQL + `wp-content/uploads` (ежедневно)
+- **`.env.weekly`** — полный `~/www` + MySQL (раз в неделю / 2 недели)
+
+```bash
+ENV_FILE=.env.daily ./backup.sh
+ENV_FILE=.env.weekly ./backup.sh
+```
+
+Обычный `.env` тоже поддерживается (`cp .env.example .env && ./backup.sh`).
 
 ## rclone setup
 
@@ -206,7 +217,9 @@ ls -t logs/backup-*.log | head -1 | xargs tail -f
 backup-manager/
 ├── backup.sh              # Main backup entry point
 ├── restore.sh             # Restore entry point
-├── .env.example           # Configuration template
+├── .env.example           # Single-config template
+├── .env.daily.example     # Daily: DB + uploads
+├── .env.weekly.example    # Weekly: full site + DB
 ├── lib/
 │   ├── logger.sh          # Per-run logging
 │   ├── safety.sh          # Path validation, safe removal, tar-slip checks

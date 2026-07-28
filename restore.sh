@@ -103,10 +103,13 @@ main() {
 
 	cd "${SCRIPT_DIR}"
 
-	init_logger
-	log_info "=== Restore started ==="
+	local env_file
+	env_file="$(resolve_env_file "${SCRIPT_DIR}")"
+	load_env "${env_file}"
 
-	load_env "${SCRIPT_DIR}/.env"
+	init_logger
+	log_info "=== Restore started (env: $(basename "${env_file}")) ==="
+
 	validate_restore_env
 
 	if [[ "${FORCE}" != "true" && "${FORCE}" != "false" ]]; then
