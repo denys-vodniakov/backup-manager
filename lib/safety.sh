@@ -29,29 +29,107 @@ resolve_path() {
 	cd "${path}" 2>/dev/null && pwd -P
 }
 
+path_device_inode() {
+	local path="$1"
+	stat -c '%d:%i' "${path}" 2>/dev/null || stat -f '%d:%i' "${path}" 2>/dev/null
+}
+
+# True if both paths exist and refer to the same directory (OVH /home vs /homez.N).
+same_directory() {
+	local a="$1"
+	local b="$2"
+	local ia ib
+
+	[[ -d "${a}" && -d "${b}" ]] || return 1
+	ia="$(path_device_inode "${a}")" || return 1
+	ib="$(path_device_inode "${b}")" || return 1
+	[[ -n "${ia}" && "${ia}" == "${ib}" ]]
+}
+
+# Canonicalize a path that may not exist yet (OVH: /home/user vs /homez.N/user).
+canonicalize_path() {
+	local path="$1"
+	local dir base resolved_dir
+
+	# Prefer GNU realpath when available (handles non-existent tails).
+	if command -v realpath >/dev/null 2>&1; then
+		realpath -m "${path}" 2>/dev/null && return 0
+	fi
+
+	if [[ -d "${path}" ]]; then
+		resolve_path "${path}"
+		return $?
+	fi
+
+	if [[ -e "${path}" ]]; then
+		dir="$(dirname -- "${path}")"
+		base="$(basename -- "${path}")"
+		resolved_dir="$(resolve_path "${dir}")" || return 1
+		printf '%s/%s' "${resolved_dir}" "${base}"
+		return 0
+	fi
+
+	# Walk up until an existing directory is found, then rejoin the suffix.
+	dir="${path}"
+	base=""
+	while [[ ! -d "${dir}" ]]; do
+		if [[ "${dir}" == "/" || "${dir}" == "." || -z "${dir}" ]]; then
+			return 1
+		fi
+		if [[ -n "${base}" ]]; then
+			base="$(basename -- "${dir}")/${base}"
+		else
+			base="$(basename -- "${dir}")"
+		fi
+		dir="$(dirname -- "${dir}")"
+	done
+
+	resolved_dir="$(resolve_path "${dir}")" || return 1
+	printf '%s/%s' "${resolved_dir}" "${base}"
+}
+
 assert_path_under_parent() {
 	local child="$1"
 	local parent="$2"
 	local label="${3:-path}"
-	local resolved_parent
-
-	resolved_parent="$(resolve_path "${parent}")" || {
-		log_error "${label}: cannot resolve parent path: ${parent}"
-		return 1
-	}
+	local resolved_parent resolved_child child_dir
 
 	if [[ "${child}" == *'..'* ]]; then
 		log_error "${label} must not contain '..' components"
 		return 1
 	fi
 
-	case "${child%/}" in
+	resolved_parent="$(canonicalize_path "${parent}")" || {
+		log_error "${label}: cannot resolve parent path: ${parent}"
+		return 1
+	}
+	resolved_child="$(canonicalize_path "${child}")" || {
+		log_error "${label}: cannot resolve path: ${child}"
+		return 1
+	}
+
+	case "${resolved_child}" in
 		"${resolved_parent}"|"${resolved_parent}"/*) return 0 ;;
-		*)
-			log_error "${label} must be under ${resolved_parent} (got: ${child})"
-			return 1
-			;;
 	esac
+
+	# Fallback for hosts where /home/user and /homez.N/user are the same dir
+	# but canonicalize to different string prefixes.
+	child_dir="$(dirname -- "${child}")"
+	if same_directory "${parent}" "${child_dir}"; then
+		return 0
+	fi
+	if [[ -d "${resolved_parent}" ]]; then
+		local walk="${child_dir}"
+		while [[ -n "${walk}" && "${walk}" != "/" ]]; do
+			if same_directory "${resolved_parent}" "${walk}" || same_directory "${parent}" "${walk}"; then
+				return 0
+			fi
+			walk="$(dirname -- "${walk}")"
+		done
+	fi
+
+	log_error "${label} must be under ${resolved_parent} (got: ${resolved_child})"
+	return 1
 }
 
 validate_backup_name() {
