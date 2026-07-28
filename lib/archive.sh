@@ -87,9 +87,14 @@ create_archive() {
 	_ARCHIVE_TAR_PID=""
 	trap - RETURN
 
-	if [[ "${tar_status}" -ne 0 ]]; then
-		log_error "Failed to create archive: ${output_file}"
+	# GNU tar: 0 = ok, 1 = warnings (e.g. "file changed as we read it"), 2+ = fatal
+	if [[ "${tar_status}" -ge 2 ]]; then
+		log_error "Failed to create archive (tar exit ${tar_status}): ${output_file}"
 		return 1
+	fi
+
+	if [[ "${tar_status}" -eq 1 ]]; then
+		log_warn "tar reported warnings (often 'file changed as we read it' on live uploads) — archive kept"
 	fi
 
 	if [[ ! -s "${output_file}" ]]; then
