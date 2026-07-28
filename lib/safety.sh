@@ -29,26 +29,67 @@ resolve_path() {
 	cd "${path}" 2>/dev/null && pwd -P
 }
 
+# Canonicalize a path that may not exist yet (OVH: /home/user vs /homez.N/user).
+canonicalize_path() {
+	local path="$1"
+	local dir base resolved_dir
+
+	if [[ -d "${path}" ]]; then
+		resolve_path "${path}"
+		return $?
+	fi
+
+	if [[ -e "${path}" ]]; then
+		dir="$(dirname -- "${path}")"
+		base="$(basename -- "${path}")"
+		resolved_dir="$(resolve_path "${dir}")" || return 1
+		printf '%s/%s' "${resolved_dir}" "${base}"
+		return 0
+	fi
+
+	# Walk up until an existing directory is found, then rejoin the suffix.
+	dir="${path}"
+	base=""
+	while [[ ! -d "${dir}" ]]; do
+		if [[ "${dir}" == "/" || "${dir}" == "." || -z "${dir}" ]]; then
+			return 1
+		fi
+		if [[ -n "${base}" ]]; then
+			base="$(basename -- "${dir}")/${base}"
+		else
+			base="$(basename -- "${dir}")"
+		fi
+		dir="$(dirname -- "${dir}")"
+	done
+
+	resolved_dir="$(resolve_path "${dir}")" || return 1
+	printf '%s/%s' "${resolved_dir}" "${base}"
+}
+
 assert_path_under_parent() {
 	local child="$1"
 	local parent="$2"
 	local label="${3:-path}"
-	local resolved_parent
-
-	resolved_parent="$(resolve_path "${parent}")" || {
-		log_error "${label}: cannot resolve parent path: ${parent}"
-		return 1
-	}
+	local resolved_parent resolved_child
 
 	if [[ "${child}" == *'..'* ]]; then
 		log_error "${label} must not contain '..' components"
 		return 1
 	fi
 
-	case "${child%/}" in
+	resolved_parent="$(canonicalize_path "${parent}")" || {
+		log_error "${label}: cannot resolve parent path: ${parent}"
+		return 1
+	}
+	resolved_child="$(canonicalize_path "${child}")" || {
+		log_error "${label}: cannot resolve path: ${child}"
+		return 1
+	}
+
+	case "${resolved_child}" in
 		"${resolved_parent}"|"${resolved_parent}"/*) return 0 ;;
 		*)
-			log_error "${label} must be under ${resolved_parent} (got: ${child})"
+			log_error "${label} must be under ${resolved_parent} (got: ${resolved_child})"
 			return 1
 			;;
 	esac

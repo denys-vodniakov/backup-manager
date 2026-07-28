@@ -176,6 +176,16 @@ validate_backup_env() {
 	fi
 
 	mkdir -p "${BACKUP_DIR}" "${TMP_DIR}" "${LOG_DIR}"
+
+	# OVH shared hosting: $HOME may be a symlink (/home/user → /homez.N/user).
+	# Canonicalize so later path checks compare the same physical paths.
+	BACKUP_DIR="$(canonicalize_path "${BACKUP_DIR}")"
+	TMP_DIR="$(canonicalize_path "${TMP_DIR}")"
+	LOG_DIR="$(canonicalize_path "${LOG_DIR}")"
+	if [[ -d "${SOURCE_PATH}" ]]; then
+		SOURCE_PATH="$(canonicalize_path "${SOURCE_PATH}")"
+	fi
+
 	return 0
 }
 
@@ -244,6 +254,13 @@ validate_restore_env() {
 	fi
 
 	mkdir -p "${TMP_DIR}" "${LOG_DIR}"
+	TMP_DIR="$(canonicalize_path "${TMP_DIR}")"
+	LOG_DIR="$(canonicalize_path "${LOG_DIR}")"
+	BACKUP_DIR="$(canonicalize_path "${BACKUP_DIR}")"
+	if [[ -d "${RESTORE_TARGET_PATH}" ]]; then
+		RESTORE_TARGET_PATH="$(canonicalize_path "${RESTORE_TARGET_PATH}")"
+	fi
+
 	return 0
 }
 
