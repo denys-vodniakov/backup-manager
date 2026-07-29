@@ -51,11 +51,37 @@ load_env() {
 
 	validate_env_file_permissions "${env_file}"
 
+	# Preserve CLI/cron overrides that were set before sourcing .env
+	local _had_file_backup=0 _had_mysql_backup=0 _had_progress=0
+	local _file_backup="" _mysql_backup="" _progress=""
+	if [[ -n "${ENABLE_FILE_BACKUP+x}" ]]; then
+		_had_file_backup=1
+		_file_backup="${ENABLE_FILE_BACKUP}"
+	fi
+	if [[ -n "${ENABLE_MYSQL_BACKUP+x}" ]]; then
+		_had_mysql_backup=1
+		_mysql_backup="${ENABLE_MYSQL_BACKUP}"
+	fi
+	if [[ -n "${BACKUP_PROGRESS_SECONDS+x}" ]]; then
+		_had_progress=1
+		_progress="${BACKUP_PROGRESS_SECONDS}"
+	fi
+
 	# shellcheck disable=SC1090
 	set -a
 	# shellcheck source=/dev/null
 	source "${env_file}"
 	set +a
+
+	if [[ "${_had_file_backup}" -eq 1 ]]; then
+		ENABLE_FILE_BACKUP="${_file_backup}"
+	fi
+	if [[ "${_had_mysql_backup}" -eq 1 ]]; then
+		ENABLE_MYSQL_BACKUP="${_mysql_backup}"
+	fi
+	if [[ "${_had_progress}" -eq 1 ]]; then
+		BACKUP_PROGRESS_SECONDS="${_progress}"
+	fi
 }
 
 path_is_under() {

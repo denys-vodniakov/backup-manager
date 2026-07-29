@@ -2,6 +2,8 @@
 # shellcheck shell=bash
 # MySQL database dump helpers.
 
+: "${BACKUP_PROGRESS_SECONDS:=15}"
+
 mysql_dump() {
 	local output_file="$1"
 
@@ -17,19 +19,41 @@ mysql_dump() {
 	# Use MYSQL_PWD to avoid password on command line (still visible in env; prefer .env permissions)
 	export MYSQL_PWD="${DB_PASSWORD}"
 
-	if ! mysqldump \
-		--host="${DB_HOST}" \
-		--user="${DB_USER}" \
-		--single-transaction \
-		--quick \
-		--lock-tables=false \
-		"${DB_NAME}" | gzip -c > "${output_file}"; then
-		unset MYSQL_PWD
+	local interval="${BACKUP_PROGRESS_SECONDS}"
+	local dump_status=0
+
+	(
+		mysqldump \
+			--host="${DB_HOST}" \
+			--user="${DB_USER}" \
+			--single-transaction \
+			--quick \
+			--lock-tables=false \
+			--no-tablespaces \
+			"${DB_NAME}" | gzip -c > "${output_file}"
+	) &
+	local dump_pid=$!
+
+	if [[ "${interval}" -gt 0 ]]; then
+		log_info "MySQL dump in progress… updates every ${interval}s"
+		while kill -0 "${dump_pid}" 2>/dev/null; do
+			log_info "MySQL dump progress: $(format_bytes "$(file_size_bytes "${output_file}")") written"
+			local waited=0
+			while [[ "${waited}" -lt "${interval}" ]]; do
+				kill -0 "${dump_pid}" 2>/dev/null || break 2
+				sleep 1
+				waited=$(( waited + 1 ))
+			done
+		done
+	fi
+
+	wait "${dump_pid}" || dump_status=$?
+	unset MYSQL_PWD
+
+	if [[ "${dump_status}" -ne 0 ]]; then
 		log_error "mysqldump failed for database: ${DB_NAME}"
 		return 1
 	fi
-
-	unset MYSQL_PWD
 
 	if [[ ! -s "${output_file}" ]]; then
 		log_error "MySQL dump file is empty: ${output_file}"
